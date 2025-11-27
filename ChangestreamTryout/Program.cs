@@ -7,23 +7,32 @@ namespace ChangestreamTryout
     {
         static async Task Main(string[] args)
         {
-            MongoClient client = new MongoClient("mongodb://localhost:40131/?authSource=admin"); //the mongodb refuses to connect. Idk how to solve that
-            var database = client.GetDatabase("foo");
-            var collection = database.GetCollection<BsonDocument>("test");
+            var client = new MongoClient("mongodb://localhost:27017");
+            var database = client.GetDatabase("testest");
+            var collection = database.GetCollection<BsonDocument>("testest");
 
-            var options = new ChangeStreamOptions { FullDocument = ChangeStreamFullDocumentOption.UpdateLookup };
-            var pipeline = new EmptyPipelineDefinition<ChangeStreamDocument<BsonDocument>>().Match("{operationType: { $in: [ 'insert', 'delete', 'update' ] } }");
+            var pipeline = new EmptyPipelineDefinition<ChangeStreamDocument<BsonDocument>>()
+                .Match("{operationType: { $in: ['insert', 'delete', 'update'] }}");
 
-            var cursor = collection.Watch<ChangeStreamDocument<BsonDocument>>(pipeline, options);
-
-            await collection.InsertOneAsync(new BsonDocument("Name", "Jack"));
-
-            var enumerator = cursor.ToEnumerable().GetEnumerator();
-            while (enumerator.MoveNext())
+            var options = new ChangeStreamOptions
             {
-                ChangeStreamDocument<BsonDocument> doc = enumerator.Current;
-                Console.WriteLine("It works");
-                Console.WriteLine(doc.DocumentKey);
+                FullDocument = ChangeStreamFullDocumentOption.UpdateLookup
+            };
+
+            using var cursor = collection.Watch(pipeline, options);
+
+            Console.WriteLine("Watching for changes...");
+
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(1000);
+                await collection.InsertOneAsync(new BsonDocument("Name", "Jack"));
+            });
+
+            foreach (var change in cursor.ToEnumerable())
+            {
+                Console.WriteLine("Change detected!");
+                Console.WriteLine(change.FullDocument);
             }
         }
     }
