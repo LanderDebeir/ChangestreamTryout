@@ -11,20 +11,12 @@ namespace ChangestreamTryout
             var database = client.GetDatabase("foo");
             var collection = database.GetCollection<BsonDocument>("test");
 
-            var options = new ChangeStreamOptions { FullDocument = ChangeStreamFullDocumentOption.UpdateLookup };
-            var pipeline = new EmptyPipelineDefinition<ChangeStreamDocument<BsonDocument>>().Match("{operationType: { $in: [ 'insert', 'delete', 'update' ] } }");
+            var cursor = await collection.WatchAsync();
 
-            var cursor = collection.Watch<ChangeStreamDocument<BsonDocument>>(pipeline, options);
-
-            await collection.InsertOneAsync(new BsonDocument("Name", "Jack"));
-
-            var enumerator = cursor.ToEnumerable().GetEnumerator();
-            while (enumerator.MoveNext())
+            await cursor.ForEachAsync(change =>
             {
-                ChangeStreamDocument<BsonDocument> doc = enumerator.Current;
-                Console.WriteLine("It works");
-                Console.WriteLine(doc.DocumentKey);
-            }
+                Console.WriteLine($"Received the following type of change: {change.BackingDocument}");
+            });
         }
     }
 }
