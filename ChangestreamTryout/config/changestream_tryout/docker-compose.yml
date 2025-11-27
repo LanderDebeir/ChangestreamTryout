@@ -1,0 +1,38 @@
+services:
+  changestream-tryout:
+    image: mongo:latest
+    ports:
+      - 40131:5000
+    command: >
+      bash -c "
+        mongod --port 5000 --replSet rs0 --bind_ip_all &
+        until mongosh --port 5000 --eval 'print(\"waited for connection\")'
+        do
+          sleep 1
+        done
+        mongosh --port 5000 --eval 'rs.initiate({
+          _id: \"rs0\",
+          members: [{ _id: 0, host: \"changestream-tryout:5000\" }]
+        })'
+        wait
+      "
+
+    volumes:
+      - ../../data:/data/db
+    networks:
+      - ticketing-howestprime-dev
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --port 5000 --eval 'db.adminCommand(\"ping\")'"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 40s
+    env_file: .changestream_tryout_db.env   
+    restart: unless-stopped
+
+
+networks:
+  ticketing-howestprime-dev:
+    ipam:
+      config:
+        - subnet: 10.21.0.0/16
